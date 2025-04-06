@@ -1,1 +1,7 @@
 load_dotenv
+python-binance
+pandas
+numpy
+ta
+matplotlib
+talib

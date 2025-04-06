@@ -1,0 +1,56 @@
+from typing import List
+import pandas as pd
+import ta
+import matplotlib.pyplot as plt
+
+
+def normalize_data(klines: List) -> List:
+    """
+    Normalizer data and extract ohlcv features,
+    We use ohlcv for training model
+    """
+    df = pd.DataFrame(klines, columns=[
+        'timestamp', 'open', 'high', 'low', 'close', 'volume',
+        'close_time', 'quote_asset_volume', 'number_of_trades',
+        'taker_buy_base_vol', 'taker_buy_quote_vol', 'ignore'
+    ])
+    df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+    df.set_index('timestamp', inplace=True)
+
+    for col in ['open', 'high', 'low', 'close', 'volume']:
+        df[col] = df[col].astype(float)
+
+    # print(df[['open', 'high', 'low', 'close', 'volume']].head())
+
+    return df
+
+def calculate_indications(df: List) -> List:
+    """
+    Calculate the technical indications, RSI, EMA, MACD
+    :param df: Data frame
+    :return: Data frame included technical indications
+    """
+    df['rsi'] = ta.momentum.RSIIndicator(close=df['close'], window=14).rsi()
+    df['ema_12'] = ta.trend.EMAIndicator(close=df['close'], window=12).ema_indicator()
+    df['ema_26'] = ta.trend.EMAIndicator(close=df['close'], window=26).ema_indicator()
+
+    # MACD = EMA12 - EMA26
+    df['macd'] = df['ema_12'] - df['ema_26']
+    df['price_change'] = df['close'].pct_change()  # the change by percent. (Biến động %)
+    df['volatility'] = (df['high'] - df['low']) / df['open']
+
+    # features = ['rsi', 'ema_diff', 'macd', 'price_change', 'volatility', 'volume']
+    # print(df[['close', 'rsi', 'ema_12', 'ema_26', 'macd']].tail())
+    return df
+
+def draw_chart(df: List):
+    """
+    Draw 
+    """
+    plt.figure(figsize=(14,6))
+    plt.plot(df['close'], label='Close')
+    plt.plot(df['ema_12'], label='EMA 12')
+    plt.plot(df['ema_26'], label='EMA 26')
+    plt.legend()
+    plt.title('EMA Crossover')
+    plt.show()
