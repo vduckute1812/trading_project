@@ -19,6 +19,7 @@ pullback_reference_price = None
 
 holding = False
 entry_price = 0
+index = 0
 
 client = APIClient()
 wallet = Wallet()
@@ -42,20 +43,25 @@ def sell():
 
 def on_message(ws, msg):
     global last_signal_time, awaiting_pullback, pullback_reference_price
-    global holding, entry_price
+    global holding, entry_price, index
     msg = json.loads(msg)
     if msg['e'] == 'trade':
         current_price = float(msg['p'])
         trade_volume = float(msg['q'])  # volume của giao dịch này
         timestamp = time.time()
         is_sell = msg['m']  # True = bên bán chủ động, False = bên mua chủ động
-
+        direct = -1 if is_sell else 1
         price_buffer.append((timestamp, current_price))
         volume_buffer.append(trade_volume)
-        average_10_volumn.append(trade_volume)
+        average_10_volumn.append(trade_volume * direct)
         average_30_buffer.append(current_price)
         avg_price = sum(average_30_buffer) / len(average_30_buffer)
         # print(f"📈 Giá: {current_price:.2f} USDT | 🧪 Volume 24h: {trade_volume:.5f} | is_sell: {is_sell}")
+
+        index += 1
+        index %= 10
+        if index == 0:
+            avg_trade_volume = sum(average_10_volumn) / len(average_10_volumn)
 
         # --- Nếu đang giữ coin, kiểm tra để bán ---
         if holding:
@@ -72,24 +78,20 @@ def on_message(ws, msg):
                 return
 
             # # Bán khẩn nếu có dấu hiệu bán mạnh (giá giảm và volume tăng bất thường)
-            # if is_sell and current_price < avg_price:
-            #     avg_volume = sum(volume_buffer) / len(volume_buffer)
-            #     avg_trade_volume = sum(average_10_volumn) / len(average_10_volumn)
-            #     volume_change_percent = (avg_trade_volume - avg_volume) / avg_volume
-            #     if volume_change_percent > 0.5:  # Tốc độ bán tăng 50%. Bán mạnh
-            #         print("❌ BÁN KHẨN: Áp lực bán mạnh!")
-            #         holding = False
-            #         sell()
-            #         entry_price = 0
-            #         last_signal_time = time.time()
-            #         return
+            if is_sell and current_price < avg_price and avg_trade_volume < -10 and profit < -0.02:
+                print("❌ BÁN KHẨN: Áp lực bán mạnh!")
+                holding = False
+                sell()
+                entry_price = 0
+                last_signal_time = time.time()
+                return
 
         # --- Nếu chưa giữ lệnh, xét điều kiện mua ---
         if not holding and price_buffer:
             old_price = price_buffer[0][1]
             price_change = (current_price - old_price) / old_price
             if time.time() - last_signal_time > cooldown:
-                if 0.002 < price_change <= 0.004:
+                if 0.0025 < price_change <= 0.004 and avg_trade_volume > 0:
                     print("🟢 MUA NHẸ (tăng vừa đủ)")
                     buy()
                     holding = True

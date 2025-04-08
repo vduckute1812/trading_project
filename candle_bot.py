@@ -72,9 +72,9 @@ class CandleBot:
         latest = self.__calculate_indication(symbol=self.__symbol).iloc[-1]
         # model = joblib.load('xgb_model.pkl')
         ai_signal, confident = self.ai_predict(model=model, latest=latest)
-        indication_signal = self.indication_predict(latest=latest)
-        if ai_signal == indication_signal:  # AI and indicator predict same result
-            return ai_signal, confident
+        # indication_signal = self.indication_predict(latest=latest)
+        # if ai_signal == indication_signal:  # AI and indicator predict same result
+        return ai_signal, confident
         return PriceTrend.UNKNOWN, 0.0
 
     @property
